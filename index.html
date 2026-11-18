@@ -377,8 +377,10 @@ function nickErr(n){
   return '';
 }
 const num=(v,max=1e9)=>Math.min(max,Math.max(0,Math.floor(+v||0)));
-const dk=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-const monday=()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d};
+/* El día empieza a las 4:00 y termina a las 4:00 del siguiente: lnow() devuelve la fecha 'lógica' (hora actual − 4 h). */
+const DAY_OFF=4*36e5,lnow=(t=Date.now())=>new Date(t-DAY_OFF);
+const dk=(d=lnow())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const monday=()=>{const d=lnow();d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d};
 const hm=s=>{s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?`${h} h ${m} min`:`${m} min`};
 const clock=s=>{s=Math.max(0,Math.floor(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>String(n).padStart(2,'0');return (h?h+':':'')+p(m)+':'+p(x)};
 const day=k=>S.hist[k]?.t||0;
@@ -444,7 +446,7 @@ function stats(){
 /* Racha: un día suma si se estudia al menos 1 hora (QUAL). Si hoy aún no llegas a 1 h, la racha no se pierde: cuenta hasta ayer. */
 const QUAL=3600,dias=n=>n+(n===1?' día':' días');
 function streakCur(){
-  let n=0;const d=new Date();if(day(dk(d))<QUAL)d.setDate(d.getDate()-1);
+  let n=0;const d=lnow();if(day(dk(d))<QUAL)d.setDate(d.getDate()-1);
   const end=dk(d);while(day(dk(d))>=QUAL){n++;d.setDate(d.getDate()-1)}
   return{n,end:n?end:''};
 }
@@ -457,7 +459,7 @@ function streakBest(cur){
 }
 /* La racha guardada de otra persona solo vale si su último día contado es hoy o ayer. */
 function liveStreak(u){
-  const y=new Date();y.setDate(y.getDate()-1);
+  const y=lnow();y.setDate(y.getDate()-1);
   return u.streakEnd===dk()||u.streakEnd===dk(y)?num(u.streak,36500):0;
 }
 const FL='<svg class="fl" viewBox="0 0 24 24" aria-hidden="true"><use href="#flame"/></svg>';
@@ -540,7 +542,7 @@ function listenUsers(on){
 }
 /* Ánimos: cheers/{destinatario}/{quien animó} = "AAAA-MM-DD". Solo cuentan los de hoy, así que se reinician cada día. Solo se escucha con Amigos abierto. */
 let cheerRef=null,cheerDay='';
-const cheerKey=()=>dk(new Date(sNow()));
+const cheerKey=()=>dk(lnow(sNow()));
 const cheerN=id=>Object.values(fb.cheers[id]||{}).filter(v=>v===cheerKey()).length;
 function listenCheers(on){
   if(!fb.ok)return;
@@ -626,18 +628,18 @@ function study(){
   <div class="hint">${esc(SUBJ[S.sel].n)}: <b id="v-sel"></b> acumuladas</div>`;
 }
 function weekChart(){
-  const ds=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d}),vals=ds.map(d=>day(dk(d))),mx=Math.max(3600,...vals);
+  const ds=[...Array(7)].map((_,i)=>{const d=lnow();d.setDate(d.getDate()-6+i);return d}),vals=ds.map(d=>day(dk(d))),mx=Math.max(3600,...vals);
   return `<div class="card"><div class="week">${ds.map((d,i)=>`<div title="${hm(vals[i])}"><i style="height:${vals[i]/mx*100}%"></i>${'DLMXJVS'[d.getDay()===0?0:d.getDay()]}</div>`).join('')}</div></div>`;
 }
 function statsView(){
   const st=stats(),n=S.range,gD=S.goalD*3600,gW=S.goalW*3600;
-  const td=new Date();td.setHours(0,0,0,0);
+  const td=lnow();td.setHours(0,0,0,0);
   const ds=n===7?[...Array(7)].map((_,i)=>{const d=monday();d.setDate(d.getDate()+i);return d})
     :[...Array(new Date(td.getFullYear(),td.getMonth()+1,0).getDate())].map((_,i)=>new Date(td.getFullYear(),td.getMonth(),i+1));
   const N=ds.length,vals=ds.map(d=>day(dk(d))),pastN=ds.filter(d=>d<=td).length,dm1=d=>d.toLocaleDateString('es',{day:'numeric',month:'short'});
   const rl=n===7?`Semana del ${dm1(ds[0])} al ${dm1(ds[6])}`:ds[0].toLocaleDateString('es',{month:'long',year:'numeric'}).replace(/^./,c=>c.toUpperCase());
   const mx=Math.max(gD,...vals),act=vals.filter(v=>v>0),avg=act.length?act.reduce((a,b)=>a+b,0)/act.length:0,hit=vals.filter(v=>v>=gD).length;
-  const rec=Object.values(S.hist).reduce((m,v)=>Math.max(m,v.t),0),rd=7-((new Date().getDay()+6)%7),left=Math.max(0,gW-st.week);
+  const rec=Object.values(S.hist).reduce((m,v)=>Math.max(m,v.t),0),rd=7-((lnow().getDay()+6)%7),left=Math.max(0,gW-st.week);
   const pd=Math.min(100,st.today/gD*100),pw=Math.min(100,st.week/gW*100),tot=Math.max(1,st.total);
   const ses=S.sess.slice(0,6);
   return `<div class="goals">
@@ -708,7 +710,7 @@ function moreView(){
 }
 /* ---------- Mates Wrapped: semana de sábado a viernes; se desbloquea el viernes a las 13:50 ---------- */
 const DAYN=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],cap1=s=>s[0].toUpperCase()+s.slice(1);
-const wkStart=(d=new Date())=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+1)%7));return x};
+const wkStart=(d=lnow())=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+1)%7));return x};
 const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
 function wkRec(k,mk){
   S.wk=S.wk||{};let w=S.wk[k];
@@ -735,7 +737,7 @@ function wrapData(st){
   const days=[...Array(7)].map((_,i)=>{const d=addD(st,i);return{d,n:DAYN[d.getDay()],t:day(dk(d))}});
   const total=days.reduce((a,x)=>a+x.t,0),k=dk(st),w=S.wk&&S.wk[k],end=addD(st,7);
   const sub=IDS.map(i=>({id:i,t:days.reduce((a,x)=>a+(S.hist[dk(x.d)]?.[i]||0),0)}));
-  const ss=S.sess.filter(x=>x.at>=st.getTime()&&x.at<end.getTime());
+  const ss=S.sess.filter(x=>x.at>=st.getTime()+DAY_OFF&&x.at<end.getTime()+DAY_OFF);
   let hrs=w&&w.h.some(v=>v>0)?w.h:null,f=w?w.f:0,p=w?w.p:0;
   if(f+p===0){ss.forEach(x=>{x.n==='Pomodoro'?p+=x.d:f+=x.d})}
   let lg=w&&w.l?{d:w.l.d,s:w.l.s}:null;
@@ -746,12 +748,12 @@ function wrapData(st){
   return{days,total,sub,hrs,f,p,lg,k,ss,prev,psub,wt};
 }
 function wrapView(){
-  const now=new Date(),cs=wkStart(now),ut=addD(cs,6);ut.setHours(13,50,0,0);const unl=now>=ut,latest=unl?cs:addD(cs,-7);
+  const now=new Date(),cs=wkStart(lnow()),ut=addD(cs,6);ut.setHours(13,50,0,0);const unl=now>=ut,latest=unl?cs:addD(cs,-7);
   wrapOff=Math.min(7,Math.max(0,wrapOff));
   const st=addD(latest,-7*wrapOff),en=addD(st,6),dm=d=>d.toLocaleDateString('es',{day:'numeric',month:'short'});
   let h='';
   if(!unl){
-    const ce=addD(cs,6),pr=Math.min(1,Math.max(0,(now-cs)/(ut-cs)));
+    const ce=addD(cs,6),pr=Math.min(1,Math.max(0,(now-cs-DAY_OFF)/(ut-cs-DAY_OFF)));
     h+=`<div class="card lockc"><div class="lkc">🔒</div><small class="k">Semana del ${dm(cs)} al ${dm(ce)}</small><div class="big">Tu semana tiene algo que contarte</div><div class="cd" data-cd="${ut.getTime()}">--</div><div class="bar"><i style="width:${pr*100}%"></i></div><div class="cap">Se revela el viernes a las 13:50. Hasta entonces, sigue estudiando…</div></div>`;
   }
   h+=`<div class="wnav"><button data-wo="1" aria-label="Semana anterior" ${wrapOff>=7?'disabled':''}>‹</button><div style="text-align:center"><b>Semana del ${dm(st)} al ${dm(en)}</b><div class="hint" style="margin:0">Sábado a viernes</div></div><button data-wo="-1" aria-label="Semana siguiente" ${wrapOff<=0?'disabled':''}>›</button></div>`;
